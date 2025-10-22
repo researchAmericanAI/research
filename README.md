@@ -20,6 +20,6 @@
 
 /recover → remove last response; 0: yes; 1: no
 
-https://ko-fi.com/researchnexus
+https://ko-fi.com/researchkofi
 
 *credits to Ollama for making re:search possible*
