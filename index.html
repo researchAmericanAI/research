@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>nexus</title>
+  <style>
+    body {
+      background: #181818;
+      color: #BDCEF1;
+      font-family: 'Courier New', monospace;
+      height: 100vh;
+      width: 100vw;
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      font-size: 16px;
+      line-height: 24px;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    #display, #input {
+      flex: 0 0 auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      overflow-wrap: anywhere;
+      max-width: 78ch;
+      padding: 0 1ch;
+      line-height: 1;
+    }
+    #input {
+      display: block;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: inherit;
+      font-family: inherit;
+      font-size: inherit;
+    }
+    #input .input-reverse {
+      background: #BDCEF1;
+      color: #181818;
+    }
+    #measure {
+      position: absolute;
+      visibility: hidden;
+      font-family: 'Courier New', monospace;
+      white-space: pre;
+    }
+    .reverse-video {
+      background: #BDCEF1;
+      color: #181818;
+    }
+  </style>
+</head>
+<body>
+  <div id="display"></div>
+  <div id="input" contenteditable="true"></div>
+  <span id="measure">M</span>
+  <script>
+    // State machine
+    const State = {
+      NEXUS_RECOVER: 'nexus_recover',
+      NEXUS_RELEASE: 'nexus_release',
+      NEXUS_WAIT: 'nexus_wait',
+      PROBE_RECOVER: 'probe_recover',
+      PROBE_RELEASE: 'probe_release',
+      PROBE_WAIT: 'probe_wait',
+      PROBE_RECOVER_RESPONSE: 'probe_recover_response',
+      PROBE_RECOVER_CONFIRM: 'probe_recover_confirm',
+      PROBE_RECOVER_EDIT: 'probe_recover_edit',
+      CALIBRATE_RECOVER: 'calibrate_recover',
+      CALIBRATE_RELEASE: 'calibrate_release',
+      CALIBRATE_ENDPOINT_RECOVER: 'calibrate_endpoint_recover',
+      CALIBRATE_ENDPOINT_RELEASE: 'calibrate_endpoint_release',
+      CALIBRATE_MODEL_RECOVER: 'calibrate_model_recover',
+      CALIBRATE_WAIT: 'calibrate_wait',
+      RECOVER_MENU_RECOVER: 'recover_menu_recover',
+      RECOVER_MENU_RELEASE: 'recover_menu_release',
+      RECOVER_MENU_WAIT: 'recover_menu_wait',
+      POLARITY_CONFIRM: 'polarity_confirm'
+    };
+
+    class Structure {
+      constructor() {
+        this.id = `s_${Date.now()}`;
+        this.date = new Date().toLocaleDateString();
+        this.day = new Date().toLocaleDateString('en-US', { weekday: 'short' });
+        this.releaseTime = null;
+        this.log = [];
+      }
+      addInitiation(probe) {
+        this.log.push({ type: 'initiation', id: `i_${Date.now()}`, timestamp: Date.now(), probe });
+      }
+      addResponse(probe) {
+        this.log.push({ type: 'response', id: `r_${Date.now()}`, timestamp: Date.now(), probe });
+      }
+      release() {
+        this.releaseTime = new Date().toLocaleTimeString();
+        const blob = new Blob([JSON.stringify(this, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${this.id}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    }
+
+    class Nexus {
+      constructor() {
+        this.state = State.NEXUS_RECOVER;
+        this.structures = [];
+        this.currentStructure = null;
+        this.stack = [];
+        this.backendEndpoint = 'https://researchnexus.onrender.com';
+        this.modelEndpoint = 'http://localhost:11434/api/generate';
+        this.model = 'qwen3:4b';
+        this.truth = false;
+        this.dotCount = 0;
+        this.dotInterval = null;
+        this.display = document.getElementById('display');
+        this.input = document.getElementById('input');
+        this.measure = document.getElementById('measure');
+        this.backdoorMode = false;
+        this.allowDragAndDrop = false;
+        this.lastInitiation = null;
+        this.setupEvents();
+        this.updateDimensions();
+      }
+
+      setupEvents() {
+        window.addEventListener('resize', () => this.updateDimensions());
+
+        // Ensure all input text is reverse video
+        this.input.addEventListener('input', () => {
+          this.normalizeInput();
+        });
+
+        document.addEventListener('keydown', async (e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            const cmd = this.input.textContent.trim();
+            this.input.innerHTML = '';
+            if (cmd) await this.process(cmd);
+          } else if ((e.metaKey || e.ctrlKey) && (e.key === 'c' || e.key === 'C')) {
+            e.preventDefault();
+            const selection = window.getSelection();
+            const text = selection.toString() || this.input.textContent;
+            navigator.clipboard.writeText(text).catch(err => console.error('Copy failed:', err));
+          } else if ((e.metaKey || e.ctrlKey) && (e.key === 'v' || e.key === 'V')) {
+            e.preventDefault();
+            navigator.clipboard.readText().then(text => {
+              const selection = window.getSelection();
+              const span = document.createElement('span');
+              span.className = 'input-reverse';
+              span.textContent = text;
+              if (selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                range.deleteContents();
+                range.insertNode(span);
+              } else {
+                this.input.appendChild(span);
+              }
+              const range = document.createRange();
+              range.setStartAfter(span);
+              range.collapse(true);
+              selection.removeAllRanges();
+              selection.addRange(range);
+            }).catch(err => console.error('Paste failed:', err));
+          } else if ((e.metaKey || e.ctrlKey) && (e.key === 'x' || e.key === 'X')) {
+            e.preventDefault();
+            const selection = window.getSelection();
+            const text = selection.toString() || this.input.textContent;
+            navigator.clipboard.writeText(text).catch(err => console.error('Cut failed:', err));
+            if (selection.rangeCount > 0) {
+              selection.getRangeAt(0).deleteContents();
+            } else {
+              this.input.innerHTML = '';
+            }
+          } else if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+            return;
+          } else {
+            return;
+          }
+        });
+
+        document.addEventListener('dragover', (e) => {
+          if (this.allowDragAndDrop) e.preventDefault();
+        });
+        document.addEventListener('drop', async (e) => {
+          if (!this.allowDragAndDrop) return;
+          e.preventDefault();
+          const file = e.dataTransfer.files[0];
+          if (file && file.type === 'application/json' && this.structures.length < 99) {
+            const text = await file.text();
+            try {
+              const structure = JSON.parse(text);
+              if (this.isValidStructure(structure)) {
+                this.structures.push(structure);
+                this.render();
+              }
+            } catch (error) {
+              // Silently fail on parse error
+            }
+          }
+        });
+      }
+
+      isValidStructure(s) {
+        if (typeof s !== 'object' || s === null) return false;
+        if (typeof s.id !== 'string' || typeof s.date !== 'string' || typeof s.day !== 'string') return false;
+        if (s.releaseTime !== null && typeof s.releaseTime !== 'string') return false;
+        if (!Array.isArray(s.log)) return false;
+        for (const entry of s.log) {
+          if (typeof entry.type !== 'string' || (entry.type !== 'initiation' && entry.type !== 'response')) return false;
+          if (typeof entry.id !== 'string' || typeof entry.timestamp !== 'number' || typeof entry.probe !== 'string') return false;
+        }
+        return true;
+      }
+
+      normalizeInput() {
+        const selection = window.getSelection();
+        let cursorOffset = 0;
+        let cursorNode = null;
+
+        // Save cursor position
+        if (selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          cursorNode = range.startContainer;
+          cursorOffset = range.startOffset;
+        }
+
+        // Get all text content
+        const textContent = this.input.textContent;
+
+        // Clear and rebuild with proper styling
+        this.input.innerHTML = '';
+        if (textContent) {
+          const span = document.createElement('span');
+          span.className = 'input-reverse';
+          span.textContent = textContent;
+          this.input.appendChild(span);
+
+          // Restore cursor position
+          try {
+            const range = document.createRange();
+            const textNode = span.firstChild;
+            if (textNode) {
+              const offset = Math.min(cursorOffset, textNode.length);
+              range.setStart(textNode, offset);
+              range.collapse(true);
+              selection.removeAllRanges();
+              selection.addRange(range);
+            }
+          } catch (e) {
+            // If cursor restoration fails, just place it at the end
+            const range = document.createRange();
+            range.selectNodeContents(this.input);
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+        }
+      }
+
+      updateDimensions() {
+        this.measure.style.fontSize = '100px';
+        const measuredWidth = this.measure.offsetWidth;
+        const pixelsPerChar = measuredWidth / 1;
+        const targetWidth = window.innerWidth;
+        const newFontSize = (targetWidth / 80) * (100 / pixelsPerChar);
+        const newLineHeight = window.innerHeight / 24;
+        document.body.style.fontSize = `${newFontSize}px`;
+        document.body.style.lineHeight = `${newLineHeight}px`;
+      }
+
+      startWait() {
+        this.dotCount = 0;
+        if (this.dotInterval) clearInterval(this.dotInterval);
+        this.dotInterval = setInterval(() => {
+          this.dotCount = (this.dotCount + 1) % 2;
+          this.render();
+        }, 1000);
+      }
+
+      stopWait() {
+        if (this.dotInterval) {
+          clearInterval(this.dotInterval);
+          this.dotInterval = null;
+        }
+        this.dotCount = 0;
+      }
+
+      formatStructures() {
+        if (this.structures.length === 0) return null;
+        return this.structures.map((s, i) => {
+          const preview = s.log.length > 0 ? s.log[0].probe.substring(0, 20) : 'empty';
+          return `[${i}]: [${s.date}] [${s.day}] [${s.releaseTime || 'active'}] [${preview}...]`;
+        }).join('\n');
+      }
+
+      formatStack() {
+        return this.stack.map(line => {
+          if (line.startsWith('Φ:\n')) {
+            const probe = line.slice('Φ:\n'.length);
+            return `<span class="reverse-video">Φ:${probe ? '\n' + probe : ''}</span>`;
+          } else if (line.startsWith('1:\n')) {
+            const response = line.slice('1:\n'.length);
+            return `1:\n${response}`;
+          }
+          return line;
+        }).join('\n');
+      }
+
+      async coordinate(probe) {
+        if (this.backdoorMode) {
+          const dots = '.'.repeat(78) + '\n' + '.'.repeat(78);
+          return dots;
+        }
+        try {
+          // Get formatted prompt from your server
+          const promptResponse = await fetch(`${this.backendEndpoint}/generate_prompt`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ probe, truth: this.truth })
+          });
+          const promptData = await promptResponse.json();
+
+          // Send formatted prompt to local Ollama
+          const response = await fetch(this.modelEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: this.model, prompt: promptData.formatted_prompt, stream: false })
+          });
+          const data = await response.json();
+          if (data.error) throw new Error(data.error);
+          return data.response;
+        } catch (e) {
+          return `[ERROR: ${e.message}]`;
+        }
+      }
+
+      render() {
+        let output = '';
+        const structures = this.formatStructures();
+        let dots = ' ';
+        if (this.dotCount === 1) {
+          dots = 'Φ';
+        }
+        let blockInput = false;
+        switch(this.state) {
+          case State.NEXUS_RECOVER:
+            output = '0\n1';
+            break;
+          case State.NEXUS_WAIT:
+            output = dots;
+            blockInput = true;
+            break;
+          case State.PROBE_RECOVER:
+          case State.PROBE_RECOVER_RESPONSE:
+            output = `/route\n/release\n/select\n/recover\n/polarity : ${this.truth ? '1' : '0'}\n`;
+            if (this.allowDragAndDrop) output += '[drag and drop]\n';
+            if (structures) output += `${structures}\n`;
+            if (this.stack.length > 0) output += this.formatStack();
+            break;
+          case State.PROBE_WAIT:
+            output = `/route\n/release\n/select\n/recover\n/polarity : ${this.truth ? '1' : '0'}\n`;
+            if (this.allowDragAndDrop) output += '[drag and drop]\n';
+            if (structures) output += `${structures}\n`;
+            if (this.stack.length > 0) {
+              output += this.formatStack() + '\n';
+            } else {
+              output += `<span class="reverse-video">Φ:${this.currentProbe ? '\n' + this.currentProbe : ''}</span>\n`;
+            }
+            output += `1:\n${dots}`;
+            blockInput = true;
+            break;
+          case State.PROBE_RECOVER_CONFIRM:
+            output = `/route\n/release\n/select\n/recover\n/polarity : ${this.truth ? '1' : '0'}\n`;
+            if (this.allowDragAndDrop) output += '[drag and drop]\n';
+            if (structures) output += `${structures}\n`;
+            if (this.stack.length > 0) output += this.formatStack() + '\n';
+            output += 'recover?\n0\n1';
+            break;
+          case State.PROBE_RECOVER_EDIT:
+            output = `/route\n/release\n/select\n/recover\n/polarity : ${this.truth ? '1' : '0'}\n`;
+            if (this.allowDragAndDrop) output += '[drag and drop]\n';
+            if (structures) output += `${structures}\n`;
+            if (this.stack.length > 0) output += this.formatStack();
+            break;
+          case State.POLARITY_CONFIRM:
+            output = `/route\n/release\n/select\n/recover\n/polarity : ${this.truth ? '1' : '0'}\n`;
+            if (this.allowDragAndDrop) output += '[drag and drop]\n';
+            if (structures) output += `${structures}\n`;
+            if (this.stack.length > 0) output += this.formatStack() + '\n';
+            output += 'polarity?\n0\n1';
+            break;
+          case State.CALIBRATE_RECOVER:
+            output = `/route\n/endpoint\n/model\nendpoint: <span class="reverse-video">${this.modelEndpoint || 'NULL'}</span>\nmodel: <span class="reverse-video">${this.model || 'NULL'}</span>`;
+            break;
+          case State.CALIBRATE_ENDPOINT_RECOVER:
+            output = `/route\nendpoint: <span class="reverse-video">${this.modelEndpoint || 'NULL'}</span>`;
+            break;
+          case State.CALIBRATE_MODEL_RECOVER:
+            output = `/route\nmodel: <span class="reverse-video">${this.model || 'NULL'}</span>`;
+            break;
+          case State.CALIBRATE_WAIT:
+            output = dots;
+            blockInput = true;
+            break;
+          case State.RECOVER_MENU_RECOVER:
+            output = 'route?\n0\n1';
+            break;
+          case State.RECOVER_MENU_WAIT:
+            output = dots;
+            blockInput = true;
+            break;
+        }
+        this.display.innerHTML = output;
+        this.input.contentEditable = !blockInput;
+        if (!blockInput) {
+          if (this.state === State.PROBE_RECOVER_EDIT && this.lastInitiation) {
+            const span = document.createElement('span');
+            span.className = 'input-reverse';
+            span.textContent = this.lastInitiation;
+            this.input.innerHTML = '';
+            this.input.appendChild(span);
+            const range = document.createRange();
+            range.selectNodeContents(span);
+            range.collapse(false);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+          } else {
+            this.input.textContent = '';
+          }
+          this.input.focus();
+        }
+      }
+
+      async process(cmd) {
+        const validCommands = ['/select', '/route', '/release', '/recover', '/endpoint', '/model', '/polarity'];
+        const cmdLower = cmd.toLowerCase();
+        switch(this.state) {
+          case State.NEXUS_RECOVER:
+            if (cmd === '0') {
+              this.state = State.CALIBRATE_RECOVER;
+            } else if (cmd === '1') {
+              this.state = State.PROBE_RECOVER;
+              this.currentStructure = new Structure();
+            }
+            break;
+          case State.PROBE_RECOVER:
+          case State.PROBE_RECOVER_RESPONSE:
+            if (cmdLower.startsWith('/') && !validCommands.includes(cmdLower)) {
+              return; // Silently fail for invalid commands
+            }
+            if (cmdLower === '/select') {
+              this.allowDragAndDrop = true;
+              this.state = State.PROBE_RECOVER;
+            } else if (cmdLower === '/route') {
+              this.state = State.RECOVER_MENU_RECOVER;
+            } else if (cmdLower === '/release') {
+              if (this.currentStructure) {
+                this.currentStructure.release();
+                return;
+              }
+            } else if (cmdLower === '/recover') {
+              if (this.stack.length > 0) {
+                this.state = State.PROBE_RECOVER_CONFIRM;
+              }
+            } else if (cmdLower === '/polarity') {
+              this.state = State.POLARITY_CONFIRM;
+            } else {
+              this.stack.push(`Φ:\n${cmd}`);
+              this.currentStructure.addInitiation(cmd);
+              this.state = State.PROBE_WAIT;
+              this.startWait();
+              this.currentProbe = cmd;
+              const response = await this.coordinate(cmd);
+              this.stopWait();
+              this.stack.push(`1:\n${response}`);
+              this.currentStructure.addResponse(response);
+              this.state = State.PROBE_RECOVER_RESPONSE;
+              this.allowDragAndDrop = false;
+            }
+            break;
+          case State.PROBE_RECOVER_CONFIRM:
+            if (cmd === '0') {
+              this.state = State.PROBE_RECOVER;
+            } else if (cmd === '1') {
+              if (this.stack.length > 0 && this.currentStructure.log.length > 0) {
+                if (this.stack[this.stack.length - 1].startsWith('1:\n')) {
+                  this.stack.pop();
+                }
+                if (this.currentStructure.log[this.currentStructure.log.length - 1].type === 'response') {
+                  this.currentStructure.log.pop();
+                }
+                if (this.stack.length > 0 && this.stack[this.stack.length - 1].startsWith('Φ:\n')) {
+                  this.lastInitiation = this.stack[this.stack.length - 1].slice('Φ:\n'.length);
+                  this.stack.pop();
+                } else {
+                  this.lastInitiation = '';
+                }
+                if (this.currentStructure.log.length > 0 && this.currentStructure.log[this.currentStructure.log.length - 1].type === 'initiation') {
+                  this.currentStructure.log.pop();
+                }
+                this.state = State.PROBE_RECOVER_EDIT;
+              } else {
+                this.lastInitiation = '';
+                this.state = State.PROBE_RECOVER;
+              }
+            }
+            break;
+          case State.PROBE_RECOVER_EDIT:
+            if (cmdLower.startsWith('/') && !validCommands.includes(cmdLower)) {
+              return; // Silently fail for invalid commands
+            }
+            if (cmdLower === '/select') {
+              this.allowDragAndDrop = true;
+              this.state = State.PROBE_RECOVER;
+            } else if (cmdLower === '/route') {
+              this.state = State.RECOVER_MENU_RECOVER;
+            } else if (cmdLower === '/release') {
+              if (this.currentStructure) {
+                this.currentStructure.release();
+                return;
+              }
+            } else if (cmdLower === '/recover') {
+              this.lastInitiation = null;
+              this.state = State.PROBE_RECOVER;
+            } else if (cmdLower === '/polarity') {
+              this.state = State.POLARITY_CONFIRM;
+            } else {
+              if (cmd) {
+                this.stack.push(`Φ:\n${cmd}`);
+                this.currentStructure.addInitiation(cmd);
+              }
+              this.state = State.PROBE_WAIT;
+              this.startWait();
+              this.currentProbe = cmd;
+              const response = await this.coordinate(cmd);
+              this.stopWait();
+              this.stack.push(`1:\n${response}`);
+              this.currentStructure.addResponse(response);
+              this.state = State.PROBE_RECOVER_RESPONSE;
+              this.allowDragAndDrop = false;
+              this.lastInitiation = null;
+            }
+            break;
+          case State.POLARITY_CONFIRM:
+            if (cmd === '0') {
+              this.truth = false;
+              this.state = State.PROBE_RECOVER;
+            } else if (cmd === '1') {
+              this.truth = true;
+              this.state = State.PROBE_RECOVER;
+            }
+            break;
+          case State.CALIBRATE_RECOVER:
+            if (cmdLower.startsWith('/') && !validCommands.includes(cmdLower)) {
+              return; // Silently fail for invalid commands
+            }
+            if (cmdLower === '/route') {
+              this.state = State.NEXUS_RECOVER;
+            } else if (cmdLower === '/endpoint') {
+              this.state = State.CALIBRATE_ENDPOINT_RECOVER;
+            } else if (cmdLower === '/model') {
+              this.state = State.CALIBRATE_MODEL_RECOVER;
+            }
+            break;
+          case State.CALIBRATE_ENDPOINT_RECOVER:
+            if (cmdLower === '/route') {
+              this.state = State.CALIBRATE_RECOVER;
+            } else {
+              this.modelEndpoint = cmd;
+              this.backdoorMode = (cmd === 'backdoor');
+              this.state = State.CALIBRATE_WAIT;
+              this.startWait();
+              setTimeout(() => {
+                this.stopWait();
+                this.state = State.CALIBRATE_RECOVER;
+                this.render();
+              }, 3000);
+            }
+            break;
+          case State.CALIBRATE_MODEL_RECOVER:
+            if (cmdLower === '/route') {
+              this.state = State.CALIBRATE_RECOVER;
+            } else {
+              this.model = cmd;
+              this.state = State.CALIBRATE_WAIT;
+              this.startWait();
+              setTimeout(() => {
+                this.stopWait();
+                this.state = State.CALIBRATE_RECOVER;
+                this.render();
+              }, 3000);
+            }
+            break;
+          case State.RECOVER_MENU_RECOVER:
+            if (cmd === '0') {
+              this.state = State.PROBE_RECOVER;
+            } else if (cmd === '1') {
+              this.stack = [];
+              this.currentStructure = null;
+              this.structures = [];
+              this.allowDragAndDrop = false;
+              this.state = State.NEXUS_RECOVER;
+            }
+            break;
+        }
+        this.render();
+      }
+    }
+
+    const nexus = new Nexus();
+    nexus.render();
+  </script>
+</body>
+</html>
