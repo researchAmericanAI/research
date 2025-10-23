@@ -74,4 +74,4 @@ if 'one clicking' start.bat fails
 
 files may run separately 
 
-TBD when verified
+TBD
