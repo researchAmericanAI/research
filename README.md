@@ -22,6 +22,8 @@ model: *default = qwen3:4b*
 
 *default model qwen3:4b was chosen at random*
 
+*prerequisites: python 3.6+* 
+
 *re:search made possible by Ollama*
 
-*prerequisites: python 3.6+*
+
