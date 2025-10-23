@@ -66,4 +66,12 @@ done
 
 PC: 
 
-TBD
+start.bat included
+
+yet to test if it works
+
+if 'one clicking' the start.bat fails,
+
+the files may run separately 
+
+update when verified
