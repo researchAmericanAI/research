@@ -12,7 +12,7 @@ model: *default = qwen3:4b*
 
 /select →  drag and drop previous release
 
-/recover → undo; 0: yes, 1: no
+/recover → undo - 0: yes, 1: no
 
 /polarity → 0: explorative; 1: direct answer
 
