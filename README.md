@@ -46,7 +46,7 @@ type
 
 cd ~/Downloads/research-main 
 
-*the repository download location*
+*OR YOUR repository download location*
 
 press enter
 
