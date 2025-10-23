@@ -62,25 +62,15 @@
   <script>
     // State machine
     const State = {
-      NEXUS_RECOVER: 'nexus_recover',
-      NEXUS_RELEASE: 'nexus_release',
-      NEXUS_WAIT: 'nexus_wait',
       PROBE_RECOVER: 'probe_recover',
       PROBE_RELEASE: 'probe_release',
       PROBE_WAIT: 'probe_wait',
       PROBE_RECOVER_RESPONSE: 'probe_recover_response',
       PROBE_RECOVER_CONFIRM: 'probe_recover_confirm',
       PROBE_RECOVER_EDIT: 'probe_recover_edit',
-      CALIBRATE_RECOVER: 'calibrate_recover',
-      CALIBRATE_RELEASE: 'calibrate_release',
       CALIBRATE_ENDPOINT_RECOVER: 'calibrate_endpoint_recover',
-      CALIBRATE_ENDPOINT_RELEASE: 'calibrate_endpoint_release',
       CALIBRATE_MODEL_RECOVER: 'calibrate_model_recover',
       CALIBRATE_WAIT: 'calibrate_wait',
-      RECOVER_MENU_RECOVER: 'recover_menu_recover',
-      RECOVER_MENU_RELEASE: 'recover_menu_release',
-      RECOVER_MENU_WAIT: 'recover_menu_wait',
-      POLARITY_CONFIRM: 'polarity_confirm'
     };
 
     class Structure {
@@ -111,11 +101,14 @@
 
     class Nexus {
       constructor() {
-        this.state = State.NEXUS_RECOVER;
+        this.state = State.PROBE_RECOVER;
         this.structures = [];
-        this.currentStructure = null;
+        this.currentStructure = new Structure();
         this.stack = [];
-        this.backendEndpoint = 'https://researchnexus.onrender.com';
+        // The client now ONLY talks to the local backend on port 8000
+        this.localBackend = 'http://localhost:8000';
+
+        // This is the local Ollama Endpoint, visible only for config display/edit
         this.modelEndpoint = 'http://localhost:11434/api/generate';
         this.model = 'qwen3:4b';
         this.truth = false;
@@ -134,7 +127,6 @@
       setupEvents() {
         window.addEventListener('resize', () => this.updateDimensions());
 
-        // Ensure all input text is reverse video
         this.input.addEventListener('input', () => {
           this.normalizeInput();
         });
@@ -226,17 +218,14 @@
         let cursorOffset = 0;
         let cursorNode = null;
 
-        // Save cursor position
         if (selection.rangeCount > 0) {
           const range = selection.getRangeAt(0);
           cursorNode = range.startContainer;
           cursorOffset = range.startOffset;
         }
 
-        // Get all text content
         const textContent = this.input.textContent;
 
-        // Clear and rebuild with proper styling
         this.input.innerHTML = '';
         if (textContent) {
           const span = document.createElement('span');
@@ -244,7 +233,6 @@
           span.textContent = textContent;
           this.input.appendChild(span);
 
-          // Restore cursor position
           try {
             const range = document.createRange();
             const textNode = span.firstChild;
@@ -256,7 +244,6 @@
               selection.addRange(range);
             }
           } catch (e) {
-            // If cursor restoration fails, just place it at the end
             const range = document.createRange();
             range.selectNodeContents(this.input);
             range.collapse(false);
@@ -316,58 +303,50 @@
       }
 
       async coordinate(probe) {
-        if (this.backdoorMode) {
-          const dots = '.'.repeat(78) + '\n' + '.'.repeat(78);
-          return dots;
-        }
+        // The client sends data to the local FastAPI backend (backend.py),
+        // which handles remote prompt encapsulation and local LLM execution.
         try {
-          // Get formatted prompt from your server
-          const promptResponse = await fetch(`${this.backendEndpoint}/generate_prompt`, {
+          const response = await fetch(`${this.localBackend}/generate_prompt`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ probe, truth: this.truth })
-          });
-          const promptData = await promptResponse.json();
-
-          // Send formatted prompt to local Ollama
-          const response = await fetch(this.modelEndpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: this.model, prompt: promptData.formatted_prompt, stream: false })
+            body: JSON.stringify({
+                probe: probe,
+                truth: this.truth,
+                model: this.model // Pass the model name to the local backend
+            })
           });
           const data = await response.json();
-          if (data.error) throw new Error(data.error);
-          return data.response;
+          // The local backend returns the final response text
+          return data.response || `[ERROR: Local backend response missing 'response' field.]`;
         } catch (e) {
-          return `[ERROR: ${e.message}]`;
+          return `[ERROR: Local backend communication failed. Check if backend.py is running on port 8000.]`;
         }
       }
 
       render() {
         let output = '';
         const structures = this.formatStructures();
+        const configOutput = `endpoint: <span class="reverse-video">${this.modelEndpoint || 'NULL'}</span>\nmodel: <span class="reverse-video">${this.model || 'NULL'}</span>\n`;
+
         let dots = ' ';
         if (this.dotCount === 1) {
           dots = 'Φ';
         }
         let blockInput = false;
+
+        const commandList = `/endpoint\n/model\n/release\n/select\n/recover\n/polarity : ${this.truth ? '1' : '0'}\n`;
+
         switch(this.state) {
-          case State.NEXUS_RECOVER:
-            output = '0\n1';
-            break;
-          case State.NEXUS_WAIT:
-            output = dots;
-            blockInput = true;
-            break;
+
           case State.PROBE_RECOVER:
           case State.PROBE_RECOVER_RESPONSE:
-            output = `/route\n/release\n/select\n/recover\n/polarity : ${this.truth ? '1' : '0'}\n`;
+            output = configOutput + commandList;
             if (this.allowDragAndDrop) output += '[drag and drop]\n';
             if (structures) output += `${structures}\n`;
             if (this.stack.length > 0) output += this.formatStack();
             break;
           case State.PROBE_WAIT:
-            output = `/route\n/release\n/select\n/recover\n/polarity : ${this.truth ? '1' : '0'}\n`;
+            output = configOutput + commandList;
             if (this.allowDragAndDrop) output += '[drag and drop]\n';
             if (structures) output += `${structures}\n`;
             if (this.stack.length > 0) {
@@ -379,42 +358,27 @@
             blockInput = true;
             break;
           case State.PROBE_RECOVER_CONFIRM:
-            output = `/route\n/release\n/select\n/recover\n/polarity : ${this.truth ? '1' : '0'}\n`;
+            output = configOutput + commandList;
             if (this.allowDragAndDrop) output += '[drag and drop]\n';
             if (structures) output += `${structures}\n`;
             if (this.stack.length > 0) output += this.formatStack() + '\n';
             output += 'recover?\n0\n1';
             break;
           case State.PROBE_RECOVER_EDIT:
-            output = `/route\n/release\n/select\n/recover\n/polarity : ${this.truth ? '1' : '0'}\n`;
+            output = configOutput + commandList;
             if (this.allowDragAndDrop) output += '[drag and drop]\n';
             if (structures) output += `${structures}\n`;
             if (this.stack.length > 0) output += this.formatStack();
             break;
-          case State.POLARITY_CONFIRM:
-            output = `/route\n/release\n/select\n/recover\n/polarity : ${this.truth ? '1' : '0'}\n`;
-            if (this.allowDragAndDrop) output += '[drag and drop]\n';
-            if (structures) output += `${structures}\n`;
-            if (this.stack.length > 0) output += this.formatStack() + '\n';
-            output += 'polarity?\n0\n1';
-            break;
-          case State.CALIBRATE_RECOVER:
-            output = `/route\n/endpoint\n/model\nendpoint: <span class="reverse-video">${this.modelEndpoint || 'NULL'}</span>\nmodel: <span class="reverse-video">${this.model || 'NULL'}</span>`;
-            break;
           case State.CALIBRATE_ENDPOINT_RECOVER:
-            output = `/route\nendpoint: <span class="reverse-video">${this.modelEndpoint || 'NULL'}</span>`;
+            // /route here means cancel and go back to main screen
+            output = `/route\n<span class="reverse-video">endpoint: ${this.modelEndpoint || 'NULL'}</span>`;
             break;
           case State.CALIBRATE_MODEL_RECOVER:
-            output = `/route\nmodel: <span class="reverse-video">${this.model || 'NULL'}</span>`;
+            // /route here means cancel and go back to main screen
+            output = `/route\n<span class="reverse-video">model: ${this.model || 'NULL'}</span>`;
             break;
           case State.CALIBRATE_WAIT:
-            output = dots;
-            blockInput = true;
-            break;
-          case State.RECOVER_MENU_RECOVER:
-            output = 'route?\n0\n1';
-            break;
-          case State.RECOVER_MENU_WAIT:
             output = dots;
             blockInput = true;
             break;
@@ -442,27 +406,15 @@
       }
 
       async process(cmd) {
-        const validCommands = ['/select', '/route', '/release', '/recover', '/endpoint', '/model', '/polarity'];
         const cmdLower = cmd.toLowerCase();
+
         switch(this.state) {
-          case State.NEXUS_RECOVER:
-            if (cmd === '0') {
-              this.state = State.CALIBRATE_RECOVER;
-            } else if (cmd === '1') {
-              this.state = State.PROBE_RECOVER;
-              this.currentStructure = new Structure();
-            }
-            break;
+
           case State.PROBE_RECOVER:
           case State.PROBE_RECOVER_RESPONSE:
-            if (cmdLower.startsWith('/') && !validCommands.includes(cmdLower)) {
-              return; // Silently fail for invalid commands
-            }
             if (cmdLower === '/select') {
-              this.allowDragAndDrop = true;
+              this.allowDragAndDrop = !this.allowDragAndDrop;
               this.state = State.PROBE_RECOVER;
-            } else if (cmdLower === '/route') {
-              this.state = State.RECOVER_MENU_RECOVER;
             } else if (cmdLower === '/release') {
               if (this.currentStructure) {
                 this.currentStructure.release();
@@ -473,7 +425,14 @@
                 this.state = State.PROBE_RECOVER_CONFIRM;
               }
             } else if (cmdLower === '/polarity') {
-              this.state = State.POLARITY_CONFIRM;
+              this.truth = !this.truth;
+              this.state = State.PROBE_RECOVER;
+            } else if (cmdLower === '/endpoint') {
+              this.state = State.CALIBRATE_ENDPOINT_RECOVER;
+            } else if (cmdLower === '/model') {
+              this.state = State.CALIBRATE_MODEL_RECOVER;
+            } else if (cmdLower.startsWith('/')) {
+              return;
             } else {
               this.stack.push(`Φ:\n${cmd}`);
               this.currentStructure.addInitiation(cmd);
@@ -516,14 +475,9 @@
             }
             break;
           case State.PROBE_RECOVER_EDIT:
-            if (cmdLower.startsWith('/') && !validCommands.includes(cmdLower)) {
-              return; // Silently fail for invalid commands
-            }
             if (cmdLower === '/select') {
-              this.allowDragAndDrop = true;
+              this.allowDragAndDrop = !this.allowDragAndDrop;
               this.state = State.PROBE_RECOVER;
-            } else if (cmdLower === '/route') {
-              this.state = State.RECOVER_MENU_RECOVER;
             } else if (cmdLower === '/release') {
               if (this.currentStructure) {
                 this.currentStructure.release();
@@ -533,7 +487,14 @@
               this.lastInitiation = null;
               this.state = State.PROBE_RECOVER;
             } else if (cmdLower === '/polarity') {
-              this.state = State.POLARITY_CONFIRM;
+              this.truth = !this.truth;
+              this.state = State.PROBE_RECOVER;
+            } else if (cmdLower === '/endpoint') {
+              this.state = State.CALIBRATE_ENDPOINT_RECOVER;
+            } else if (cmdLower === '/model') {
+              this.state = State.CALIBRATE_MODEL_RECOVER;
+            } else if (cmdLower.startsWith('/')) {
+              return;
             } else {
               if (cmd) {
                 this.stack.push(`Φ:\n${cmd}`);
@@ -551,30 +512,9 @@
               this.lastInitiation = null;
             }
             break;
-          case State.POLARITY_CONFIRM:
-            if (cmd === '0') {
-              this.truth = false;
-              this.state = State.PROBE_RECOVER;
-            } else if (cmd === '1') {
-              this.truth = true;
-              this.state = State.PROBE_RECOVER;
-            }
-            break;
-          case State.CALIBRATE_RECOVER:
-            if (cmdLower.startsWith('/') && !validCommands.includes(cmdLower)) {
-              return; // Silently fail for invalid commands
-            }
-            if (cmdLower === '/route') {
-              this.state = State.NEXUS_RECOVER;
-            } else if (cmdLower === '/endpoint') {
-              this.state = State.CALIBRATE_ENDPOINT_RECOVER;
-            } else if (cmdLower === '/model') {
-              this.state = State.CALIBRATE_MODEL_RECOVER;
-            }
-            break;
           case State.CALIBRATE_ENDPOINT_RECOVER:
             if (cmdLower === '/route') {
-              this.state = State.CALIBRATE_RECOVER;
+              this.state = State.PROBE_RECOVER;
             } else {
               this.modelEndpoint = cmd;
               this.backdoorMode = (cmd === 'backdoor');
@@ -582,34 +522,23 @@
               this.startWait();
               setTimeout(() => {
                 this.stopWait();
-                this.state = State.CALIBRATE_RECOVER;
+                this.state = State.PROBE_RECOVER;
                 this.render();
               }, 3000);
             }
             break;
           case State.CALIBRATE_MODEL_RECOVER:
             if (cmdLower === '/route') {
-              this.state = State.CALIBRATE_RECOVER;
+              this.state = State.PROBE_RECOVER;
             } else {
               this.model = cmd;
               this.state = State.CALIBRATE_WAIT;
               this.startWait();
               setTimeout(() => {
                 this.stopWait();
-                this.state = State.CALIBRATE_RECOVER;
+                this.state = State.PROBE_RECOVER;
                 this.render();
               }, 3000);
-            }
-            break;
-          case State.RECOVER_MENU_RECOVER:
-            if (cmd === '0') {
-              this.state = State.PROBE_RECOVER;
-            } else if (cmd === '1') {
-              this.stack = [];
-              this.currentStructure = null;
-              this.structures = [];
-              this.allowDragAndDrop = false;
-              this.state = State.NEXUS_RECOVER;
             }
             break;
         }
