@@ -74,4 +74,4 @@ if 'one clicking' the start.bat fails,
 
 the files may run separately 
 
-update when verified
+TBD when verified
