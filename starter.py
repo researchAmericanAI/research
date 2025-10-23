@@ -4,12 +4,25 @@ import sys
 import os
 import webbrowser
 import platform
+import socket # Added for finding a free port
 
 # --- Configuration ---
 BACKEND_SCRIPT = "backend.py"
 HTML_FILE = "index.html"
 REQUIREMENTS_FILE = "requirements.txt"
-BACKEND_PORT = 8000
+BACKEND_PORT = 8000 # Starting port
+
+def find_free_port(start_port):
+    """Dynamically finds an available port starting from start_port."""
+    port = start_port
+    while port < start_port + 10: # Check up to 10 ports
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('localhost', port))
+                return port
+        except OSError:
+            port += 1
+    return None
 
 def install_dependencies():
     """Installs dependencies from requirements.txt."""
@@ -27,10 +40,17 @@ def install_dependencies():
 
 def start_backend():
     """Starts the backend server in a separate, non-blocking process."""
-    print("--- 2. Starting Local Backend (FastAPI) ---")
+    
+    # Check for a free port before attempting to start the server
+    current_port = find_free_port(BACKEND_PORT)
+    if current_port is None:
+        print(f"[FATAL ERROR] Could not find a free port between {BACKEND_PORT} and {BACKEND_PORT + 9}.")
+        sys.exit(1)
+
+    print(f"--- 2. Starting Local Backend (FastAPI) on Port {current_port} ---")
     
     # Use sys.executable for cross-platform compatibility
-    command = [sys.executable, "-m", "uvicorn", "backend:app", "--port", str(BACKEND_PORT)]
+    command = [sys.executable, "-m", "uvicorn", "backend:app", "--port", str(current_port)]
     
     # Start the process in the background. The main script will handle termination.
     # Using bufsize=1 forces output buffer flushing for better real-time logging.
