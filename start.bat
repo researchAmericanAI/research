@@ -1,5 +1,6 @@
-
 @echo off
+ECHO Starting re:search setup...
+
 :: --- Clean up previously locked port 8000 (Prevents repeated startup failure) ---
 netstat -ano | findstr :8000
 IF NOT ERRORLEVEL 1 (
@@ -9,15 +10,6 @@ IF NOT ERRORLEVEL 1 (
     )
     ECHO Cleanup complete.
 )
-
-**What this does:**
-
-1.  It checks for any process listening on port 8000.
-2.  If it finds one, it extracts the Process ID (PID).
-3.  It uses `TASKKILL /PID [PID] /F` to forcefully stop that process.
-
-After updating `start.bat` with this cleanup logic, the application should launch reliably every time you click the file.
-ECHO Starting re:search setup...
 
 set PYTHON_CMD=
 set VENV_NAME=.venv
@@ -62,8 +54,6 @@ if defined PYTHON_CMD (
     ECHO --- Running starter.py ---
     :: Run the starter script *within* the activated VENV
     %PYTHON_CMD% starter.py
-    
-    :: The starter.py script handles deactivation upon exit
     
 ) else (
     ECHO.
