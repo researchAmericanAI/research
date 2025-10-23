@@ -26,4 +26,44 @@ model: *default = qwen3:4b*
 
 *re:search made possible by Ollama*
 
+*************
+installation:
+*************
 
+download the repository
+
+Mac:
+
+press command + spacebar and type terminal 
+
+press enter or select the terminal icon
+
+navigate to the location where you downloaded the repository
+
+example:
+
+type 
+
+cd ~/Downloads/research-main 
+
+*the repository download location*
+
+press enter
+
+type
+
+chmod +x start.command
+
+*allows the start.command on your Mac*
+
+press enter
+
+type
+
+./start.command
+
+done
+
+PC: 
+
+TBD
