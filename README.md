@@ -68,10 +68,10 @@ PC:
 
 start.bat included
 
-yet to test if it works
+yet to test 
 
-if 'one clicking' the start.bat fails,
+if 'one clicking' start.bat fails
 
-the files may run separately 
+files may run separately 
 
 TBD when verified
