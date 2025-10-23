@@ -10,7 +10,7 @@ model: *default = qwen3:4b*
 
 /release → export current interaction 
 
-/select →  drag and drop previous release
+/select →  drag and drop previous interaction
 
 /recover → undo - 0: yes, 1: no
 
