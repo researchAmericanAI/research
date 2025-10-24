@@ -62,7 +62,13 @@ type
 
 ./start.command
 
+*leave the terminal running...*
+
 done
+
+*double clicking the index.html will reopen the re:search terminal*
+
+*after the first run, the server can easily be ran by dragging and dropping the start.command into an empty terminal*
 
 PC: 
 
