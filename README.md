@@ -26,6 +26,12 @@ model: *default = qwen3:4b*
 
 *re:search made possible by Ollama*
 
+*note: re:search does not maintain state persistence*
+
+*resetting context each response keeps tokens precise*
+
+*refine and re:search*
+
 *************
 installation:
 *************
