@@ -120,6 +120,7 @@
         this.backdoorMode = false;
         this.allowDragAndDrop = true;
         this.lastInitiation = null;
+        this.lastActionWasFileDrop = false;
         this.setupEvents();
         this.updateDimensions();
       }
@@ -192,6 +193,7 @@
               const structure = JSON.parse(text);
               if (this.isValidStructure(structure)) {
                 this.structures.push(structure);
+                this.lastActionWasFileDrop = true;
                 this.render();
               }
             } catch (error) {
@@ -437,7 +439,12 @@
                 return;
               }
             } else if (cmdLower === '/recover') {
-              if (this.stack.length > 0) {
+              // If last action was dropping a file, delete the file
+              if (this.lastActionWasFileDrop && this.structures.length > 0) {
+                this.structures.pop();
+                this.lastActionWasFileDrop = false;
+                this.state = State.PROBE_RECOVER;
+              } else if (this.stack.length > 0) {
                 this.state = State.PROBE_RECOVER_CONFIRM;
               }
             } else if (cmdLower === '/polarity') {
@@ -452,6 +459,7 @@
             } else {
               this.stack.push(`Φ:\n${cmd}`);
               this.currentStructure.addInitiation(cmd);
+              this.lastActionWasFileDrop = false;
               this.state = State.PROBE_WAIT;
               this.startWait();
               this.currentProbe = cmd;
@@ -512,6 +520,7 @@
                 this.stack.push(`Φ:\n${cmd}`);
                 this.currentStructure.addInitiation(cmd);
               }
+              this.lastActionWasFileDrop = false;
               this.state = State.PROBE_WAIT;
               this.startWait();
               this.currentProbe = cmd;
