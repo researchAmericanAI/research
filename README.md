@@ -85,5 +85,3 @@ yet to test
 if 'one clicking' start.bat fails
 
 files may run separately 
-
-TBD
