@@ -551,10 +551,28 @@
             if (cmdLower === '/route') {
               this.state = State.PROBE_RECOVER;
             } else {
-              // Silently fail if input contains "cloud"
+              // Check if input contains "cloud"
               if (cmdLower.includes('cloud')) {
-                this.state = State.PROBE_RECOVER;
+                // List of American cloud provider keywords
+                const americanProviders = ['openai', 'anthropic', 'claude', 'gpt', 'google', 'gemini', 'meta', 'llama', 'cohere'];
+                const isAmericanCloud = americanProviders.some(provider => cmdLower.includes(provider));
+                
+                if (isAmericanCloud) {
+                  // Allow American cloud models
+                  this.model = cmd;
+                  this.state = State.CALIBRATE_WAIT;
+                  this.startWait();
+                  setTimeout(() => {
+                    this.stopWait();
+                    this.state = State.PROBE_RECOVER;
+                    this.render();
+                  }, 3000);
+                } else {
+                  // Silently fail for non-American cloud models
+                  this.state = State.PROBE_RECOVER;
+                }
               } else {
+                // Allow non-cloud models
                 this.model = cmd;
                 this.state = State.CALIBRATE_WAIT;
                 this.startWait();
