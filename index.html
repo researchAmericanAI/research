@@ -118,7 +118,7 @@
         this.input = document.getElementById('input');
         this.measure = document.getElementById('measure');
         this.backdoorMode = false;
-        this.allowDragAndDrop = false;
+        this.allowDragAndDrop = true;
         this.lastInitiation = null;
         this.setupEvents();
         this.updateDimensions();
@@ -305,12 +305,35 @@
       async coordinate(probe) {
         // The client sends data to the local FastAPI backend (backend.py),
         // which handles remote prompt encapsulation and local LLM execution.
+        
+        // Prepend dropped file's questions and responses to the probe
+        let fullProbe = '';
+        if (this.structures.length > 0) {
+          for (const structure of this.structures) {
+            for (const entry of structure.log) {
+              if (entry.type === 'initiation') {
+                fullProbe += `Φ:\n${entry.probe}\n`;
+              } else if (entry.type === 'response') {
+                fullProbe += `1:\n${entry.probe}\n`;
+              }
+            }
+          }
+        }
+        
+        // Prepend current conversation history (stack)
+        if (this.stack.length > 0) {
+          fullProbe += this.stack.join('\n') + '\n';
+        }
+        
+        // Add the new probe
+        fullProbe += probe;
+        
         try {
           const response = await fetch(`${this.localBackend}/generate_prompt`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                probe: probe,
+                probe: fullProbe,
                 truth: this.truth,
                 model: this.model // Pass the model name to the local backend
             })
@@ -334,20 +357,18 @@
         }
         let blockInput = false;
 
-        const commandList = `/endpoint\n/model\n/release\n/select\n/recover\n/polarity : ${this.truth ? '1' : '0'}\n`;
+        const commandList = `/endpoint /model /release /recover /polarity : ${this.truth ? '1' : '0'}\n`;
 
         switch(this.state) {
 
           case State.PROBE_RECOVER:
           case State.PROBE_RECOVER_RESPONSE:
             output = configOutput + commandList;
-            if (this.allowDragAndDrop) output += '[drag and drop]\n';
             if (structures) output += `${structures}\n`;
             if (this.stack.length > 0) output += this.formatStack();
             break;
           case State.PROBE_WAIT:
             output = configOutput + commandList;
-            if (this.allowDragAndDrop) output += '[drag and drop]\n';
             if (structures) output += `${structures}\n`;
             if (this.stack.length > 0) {
               output += this.formatStack() + '\n';
@@ -359,14 +380,12 @@
             break;
           case State.PROBE_RECOVER_CONFIRM:
             output = configOutput + commandList;
-            if (this.allowDragAndDrop) output += '[drag and drop]\n';
             if (structures) output += `${structures}\n`;
             if (this.stack.length > 0) output += this.formatStack() + '\n';
             output += 'recover?\n0\n1';
             break;
           case State.PROBE_RECOVER_EDIT:
             output = configOutput + commandList;
-            if (this.allowDragAndDrop) output += '[drag and drop]\n';
             if (structures) output += `${structures}\n`;
             if (this.stack.length > 0) output += this.formatStack();
             break;
@@ -412,10 +431,7 @@
 
           case State.PROBE_RECOVER:
           case State.PROBE_RECOVER_RESPONSE:
-            if (cmdLower === '/select') {
-              this.allowDragAndDrop = !this.allowDragAndDrop;
-              this.state = State.PROBE_RECOVER;
-            } else if (cmdLower === '/release') {
+            if (cmdLower === '/release') {
               if (this.currentStructure) {
                 this.currentStructure.release();
                 return;
@@ -444,7 +460,6 @@
               this.stack.push(`1:\n${response}`);
               this.currentStructure.addResponse(response);
               this.state = State.PROBE_RECOVER_RESPONSE;
-              this.allowDragAndDrop = false;
             }
             break;
           case State.PROBE_RECOVER_CONFIRM:
@@ -475,10 +490,7 @@
             }
             break;
           case State.PROBE_RECOVER_EDIT:
-            if (cmdLower === '/select') {
-              this.allowDragAndDrop = !this.allowDragAndDrop;
-              this.state = State.PROBE_RECOVER;
-            } else if (cmdLower === '/release') {
+            if (cmdLower === '/release') {
               if (this.currentStructure) {
                 this.currentStructure.release();
                 return;
@@ -508,7 +520,6 @@
               this.stack.push(`1:\n${response}`);
               this.currentStructure.addResponse(response);
               this.state = State.PROBE_RECOVER_RESPONSE;
-              this.allowDragAndDrop = false;
               this.lastInitiation = null;
             }
             break;
