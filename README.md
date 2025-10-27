@@ -1,4 +1,4 @@
-# re:search 
+# researchAmericanAI
 
 endpoint: *default = local Ollama endpoint*
 
