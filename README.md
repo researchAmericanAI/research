@@ -2,7 +2,7 @@
 
 endpoint: *default = local Ollama endpoint*
 
-model: *default = qwen3:4b* 
+model: *default = llama3.2*
 
 /endpoint → endpoint entry screen
 
