@@ -43,10 +43,4 @@ PC:
 
 start.bat included
 
-untested
-
-alternatively, run files separately 
-
-have fun!
-
 *support re:search https://ko-fi.com/researchkofi*
