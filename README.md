@@ -2,29 +2,21 @@
 
 endpoint: *default = local Ollama endpoint*
 
-model: *default = llama3.2*
+model: *default = llama3.2; customizable (copy names of models from ollama site library)*
 
-/endpoint → endpoint entry screen
+/endpoint → endpoint entry screen (type in the endpoint where Ollama is running)
 
-/model → model name entry screen
+/model → model name entry screen (type in the name of the model from ollama library)
 
-/release → export current interaction 
+/release → export current conversation to your browser donloads; drag and drop them into the window to use them later
 
-/select →  drag and drop previous interaction
+/recover → deletes the last dropped file or the last response from the model, whichever came last - 0: yes, 1: no
 
-/recover → undo - 0: yes, 1: no
-
-/polarity → 0: exploration; 1: direct answers
-
-/route → back
+/polarity → 0: answers with the full 55 tool set; 1: answers yes, no, or directly
 
 *support re:search https://ko-fi.com/researchkofi*
 
-*default model qwen3:4b was chosen at random*
-
-*prerequisites: python 3.6+* 
-
-*re:search made possible by Ollama*
+*prerequisites: python 3.6+. Ollama* 
 
 *************
 installation:
@@ -36,46 +28,34 @@ Mac:
 
 press command + spacebar and type terminal 
 
-press enter or select the terminal icon
+use enter on the keyboard or select the icon
 
-navigate to the location where you downloaded the repository
+enter the following:
 
-example:
+cd ~/Downloads/research-main *(the location where you downloaded the repository may differ)*
 
-type 
+chmod +x start.command *(allows the start.command on your Mac)*
 
-cd ~/Downloads/research-main 
-
-*the location where you downloaded the repository; that may differ from the location above*
-
-press enter
-
-type
-
-chmod +x start.command
-
-*allows the start.command on your Mac*
-
-press enter
-
-type
-
-./start.command
+./start.command *(opens index.html, the UI. clicking index in the folder will reopen the UI if you lose it.)*
 
 *leave the terminal running...*
 
 done
 
-*double clicking the index.html will reopen the re:search terminal*
-
-*after the first run, the server can easily be ran by dragging and dropping the start.command into an empty terminal*
+*after the first time you run the chmod +x start.command, the server can simply be ran by executing the start.command from the root folder in an empty terminal window*
 
 PC: 
 
 start.bat included
 
-yet to test 
+i couldn't test
 
 if 'one clicking' start.bat fails
 
 files may run separately 
+
+i'm awaiting feedback
+
+i hope it works and doesn't cause any trouble
+
+enjoy!
