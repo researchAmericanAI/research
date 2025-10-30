@@ -1,6 +1,6 @@
 # researchAmericanAI
 
-/endpoint → type in the endpoint where Ollama is running on you computer with /generate at the end. for example, my local host is http://localhost:11434/. in the window, i type, http://localhost:11434/generate. if you're unsure what to do, search ' help me find my local ollama endpoint' using any chatbot. they will explain.
+/endpoint → type in the endpoint where Ollama is running on you computer with /api/generate at the end. for example, my local host is http://localhost:11434/. in the window, i type, http://localhost:11434/api/generate. if you're unsure what to do, search ' help me find my local ollama endpoint' using any chatbot. they will explain.
 
 /model → type in the name of the model that you are currently wanting to use exactly as it appears in the Ollama library (https://ollama.com/library) you can use a model from the Ollama window by selecting it from the drop down menu, typing to Ollama once to trigger the download for the model, and then navigating back to the research window. if it is not available from the drop down, you will instead have to run it from a terminal window. open a new terminal window and run the model's execution line from the ollama website's library e.g. 'ollama run gpt-oss:20b'. keep the terminal open while you use it, and close it before you change to another one.
 
