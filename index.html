@@ -133,7 +133,10 @@
         });
 
         document.addEventListener('keydown', async (e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
+          if (e.key === 'Enter' && e.shiftKey) {
+            e.preventDefault();
+            document.execCommand('insertText', false, ' '.repeat(80));
+          } else if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             const cmd = this.input.textContent.trim();
             this.input.innerHTML = '';
@@ -218,12 +221,13 @@
       normalizeInput() {
         const selection = window.getSelection();
         let cursorOffset = 0;
-        let cursorNode = null;
 
         if (selection.rangeCount > 0) {
           const range = selection.getRangeAt(0);
-          cursorNode = range.startContainer;
-          cursorOffset = range.startOffset;
+          const preCaretRange = range.cloneRange();
+          preCaretRange.selectNodeContents(this.input);
+          preCaretRange.setEnd(range.endContainer, range.endOffset);
+          cursorOffset = preCaretRange.toString().length;
         }
 
         const textContent = this.input.textContent;
