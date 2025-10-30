@@ -1,4 +1,5 @@
-# researchAmericanAI
+researchAmericanAI
+interface for running ollama models locally. has two modes: one uses 55 problem-solving tools for deep analysis, the other gives you straight answers.
 
 /endpoint → type in the endpoint where Ollama is running on you computer with /api/generate at the end. for example, my local host is http://localhost:11434/. in the window, i type, http://localhost:11434/api/generate. if you're unsure what to do, search ' help me find my local ollama endpoint' using any chatbot. they will explain.
 
@@ -41,16 +42,10 @@ PC:
 
 start.bat included
 
-i couldn't test
+untested
 
-if 'one clicking' start.bat fails
+alternatively, run files seprately 
 
-files may run separately 
-
-i'm awaiting feedback
-
-i hope it works and doesn't cause any trouble
-
-enjoy!
+have fun!
 
 *support re:search https://ko-fi.com/researchkofi*
