@@ -1,7 +1,4 @@
-
-DISCLAIMER:
-
-prompts are sent to a private render server. it wraps them in a problem-solving framework. they are then returned to your local ollama model. the specific structure isn't disclosed. your data is not stored or logged. if you need fully local operation with no external calls, don't use this.
+DISCLAIMER: prompts are sent to a private render server. it wraps them in a problem-solving framework. these are then returned to your local ollama model. the specific structure isn't disclosed. your data is not stored or logged. if you need fully local operation with no external calls, this is not for you.
 
 researchAmericanAI uses 55 problem-solving tools with local Ollama models 
 
