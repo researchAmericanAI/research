@@ -1,9 +1,5 @@
 # researchAmericanAI
 
-endpoint: *default = local Ollama endpoint*
-
-model: *default = llama3.2; customizable (copy names of models from ollama site library)*
-
 /endpoint → endpoint entry screen (type in the endpoint where Ollama is running)
 
 /model → model name entry screen (type in the name of the model from ollama library)
