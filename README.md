@@ -8,7 +8,7 @@
 
 /recover → this deletes the last dropped file or the last response from the model, whichever came last, it's just a way to undo what happened last - 0: yes, 1: no
 
-/polarity → 0: when you have it in 0 mode, it will try to answer with the full 55 problem-solving toolsw; 1: when you have it in 1 mode, it will try to answer with yes, no, or give a direct answer
+/polarity → 0: when you have it in 0 mode, it will try to answer with the full 55 problem-solving tools; 1: when you have it in 1 mode, it will try to answer with yes, no, or give a direct answer
 
 *prerequisites: python 3.6+. Ollama* 
 *if you do not have python, the .command will automatically install it for you on Mac*
