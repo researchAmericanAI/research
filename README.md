@@ -10,8 +10,6 @@
 
 /polarity → 0: answers with the full 55 tool set; 1: answers yes, no, or directly
 
-*support re:search https://ko-fi.com/researchkofi*
-
 *prerequisites: python 3.6+. Ollama* 
 
 *************
@@ -53,3 +51,5 @@ i'm awaiting feedback
 i hope it works and doesn't cause any trouble
 
 enjoy!
+
+*support re:search https://ko-fi.com/researchkofi*
