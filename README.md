@@ -1,4 +1,4 @@
-researchAmericanAI is an interface for running ollama models locally. it has two modes: one uses 55 problem-solving tools for deep analysis, the other gives you straight answers.
+researchAmericanAI uses 55 problem-solving tools with local Ollama models 
 
 /endpoint → type in the endpoint where Ollama is running on your computer with /api/generate at the end. for example, my local host is http://localhost:11434/. in the window, i type, http://localhost:11434/api/generate. if you're unsure what to do, search ' help me find my local ollama endpoint' using any chatbot. they will explain.
 
@@ -8,7 +8,7 @@ researchAmericanAI is an interface for running ollama models locally. it has two
 
 /recover → this deletes the last dropped file or the last response from the model, whichever came last, it's just a way to undo what happened last - 0: yes, 1: no
 
-/polarity → 0: when you have it in 0 mode, it will try to answer with the full 55 problem-solving tools; 1: when you have it in 1 mode, it will try to answer with yes, no, or give a direct answer
+/polarity → 0: when you have it in 0 mode, it will use the full problem-solving toolset; 1: when you have it in 1 mode, it will try to answer with yes, no, or give a direct answer
 
 *prerequisites: python 3.6+. Ollama* 
 *if you do not have python, the .command will automatically install it for you on Mac*
