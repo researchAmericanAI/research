@@ -18,8 +18,6 @@
 installation:
 *************
 
-download the repository
-
 Mac:
 
 press command + spacebar and type terminal 
