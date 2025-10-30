@@ -1,3 +1,8 @@
+
+DISCLAIMER:
+
+"prompts are sent to a private render server. it wraps them in a problem-solving framework. they are then returned to your local ollama model. the specific structure isn't disclosed. your data is not stored or logged. if you need fully local operation with no external calls, don't use this."
+
 researchAmericanAI uses 55 problem-solving tools with local Ollama models 
 
 /endpoint → type in the endpoint where Ollama is running on your computer with /api/generate added at the end. for example, my local host is http://localhost:11434/. in the window, i type, http://localhost:11434/api/generate. if you're unsure what to do, search 'help me find my local ollama endpoint'.
