@@ -37,8 +37,6 @@ chmod +x start.command *(allows the start.command on your Mac)*
 
 *after the first time you run the chmod +x start.command, the server can simply be ran by executing the start.command from the root folder in an empty terminal window*
 
-run! 
-
 PC: 
 
 start.bat included
