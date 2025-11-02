@@ -10,6 +10,10 @@ re:searchAI uses problem-solving analysis with Ollama models
 
 /recover → this deletes the last dropped file or the last response from the model, whichever came last, it's just a way to undo what happened last - 0: yes, 1: no
 
+/intro → add a prompt wrapper prefix
+
+/outro→ add a prompt wrapper postfix 
+
 /polarity → 0: when in 0 mode, it will use the full problem-solving toolset; 1: when in 1 mode, it will try to answer with yes, no, or give a direct answer
 
 *prerequisites: python 3.6+. Ollama* 
