@@ -20,7 +20,7 @@ re:searchAI uses problem-solving analysis with Ollama models
 *if you do not have python, the .command will automatically install it for you on Mac*
 
 *************
-installation: (update: Mac app added; check the repo for the .zip and follow the instructions that are inside of it)
+installation: (update: Mac app added; check the repo for the .zip and follow the installation guide)
 *************
 
 Mac:
