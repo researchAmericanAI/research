@@ -70,6 +70,8 @@
       PROBE_RECOVER_EDIT: 'probe_recover_edit',
       CALIBRATE_ENDPOINT_RECOVER: 'calibrate_endpoint_recover',
       CALIBRATE_MODEL_RECOVER: 'calibrate_model_recover',
+      CALIBRATE_INTRO_RECOVER: 'calibrate_intro_recover',
+      CALIBRATE_OUTRO_RECOVER: 'calibrate_outro_recover',
       CALIBRATE_WAIT: 'calibrate_wait',
     };
 
@@ -112,6 +114,8 @@
         this.modelEndpoint = 'http://localhost:11434/api/generate';
         this.model = 'null';
         this.truth = false;
+        this.intro = '';
+        this.outro = '';
         this.dotCount = 0;
         this.dotInterval = null;
         this.display = document.getElementById('display');
@@ -212,71 +216,44 @@
         if (s.releaseTime !== null && typeof s.releaseTime !== 'string') return false;
         if (!Array.isArray(s.log)) return false;
         for (const entry of s.log) {
-          if (typeof entry.type !== 'string' || (entry.type !== 'initiation' && entry.type !== 'response')) return false;
+          if (!entry || !entry.type || !['initiation', 'response'].includes(entry.type)) return false;
           if (typeof entry.id !== 'string' || typeof entry.timestamp !== 'number' || typeof entry.probe !== 'string') return false;
         }
         return true;
       }
 
       normalizeInput() {
-        const selection = window.getSelection();
-        let cursorOffset = 0;
-
-        if (selection.rangeCount > 0) {
-          const range = selection.getRangeAt(0);
-          const preCaretRange = range.cloneRange();
-          preCaretRange.selectNodeContents(this.input);
-          preCaretRange.setEnd(range.endContainer, range.endOffset);
-          cursorOffset = preCaretRange.toString().length;
-        }
-
-        const textContent = this.input.textContent;
-
-        this.input.innerHTML = '';
-        if (textContent) {
-          const span = document.createElement('span');
-          span.className = 'input-reverse';
-          span.textContent = textContent;
-          this.input.appendChild(span);
-
-          try {
-            const range = document.createRange();
-            const textNode = span.firstChild;
-            if (textNode) {
-              const offset = Math.min(cursorOffset, textNode.length);
-              range.setStart(textNode, offset);
-              range.collapse(true);
-              selection.removeAllRanges();
-              selection.addRange(range);
-            }
-          } catch (e) {
-            const range = document.createRange();
-            range.selectNodeContents(this.input);
-            range.collapse(false);
-            selection.removeAllRanges();
-            selection.addRange(range);
+        const nodes = Array.from(this.input.childNodes);
+        const newNodes = [];
+        for (const node of nodes) {
+          if (node.nodeType === Node.TEXT_NODE) {
+            newNodes.push(node);
+          } else if (node.nodeType === Node.ELEMENT_NODE && node.classList && node.classList.contains('input-reverse')) {
+            newNodes.push(node);
+          } else if (node.nodeType === Node.ELEMENT_NODE) {
+            const text = node.textContent;
+            newNodes.push(document.createTextNode(text));
           }
+        }
+        this.input.innerHTML = '';
+        for (const node of newNodes) {
+          this.input.appendChild(node);
         }
       }
 
       updateDimensions() {
-        this.measure.style.fontSize = '100px';
-        const measuredWidth = this.measure.offsetWidth;
-        const pixelsPerChar = measuredWidth / 1;
-        const targetWidth = window.innerWidth;
-        const newFontSize = (targetWidth / 80) * (100 / pixelsPerChar);
-        const newLineHeight = window.innerHeight / 24;
-        document.body.style.fontSize = `${newFontSize}px`;
-        document.body.style.lineHeight = `${newLineHeight}px`;
+        const charWidth = this.measure.offsetWidth;
+        const charHeight = this.measure.offsetHeight;
+        this.columns = Math.floor((window.innerWidth - 2 * charWidth) / charWidth);
+        this.rows = Math.floor(window.innerHeight / charHeight);
       }
 
       startWait() {
         this.dotCount = 0;
-        if (this.dotInterval) clearInterval(this.dotInterval);
         this.dotInterval = setInterval(() => {
-          this.dotCount = (this.dotCount + 1) % 2;
+          this.dotCount = (this.dotCount + 1) % 4;
           this.render();
-        }, 1000);
+        }, 500);
       }
 
       stopWait() {
@@ -287,83 +264,79 @@
         this.dotCount = 0;
       }
 
-      formatStructures() {
-        if (this.structures.length === 0) return null;
-        return this.structures.map((s, i) => {
-          const preview = s.log.length > 0 ? s.log[0].probe.substring(0, 20) : 'empty';
-          return `[${i}]: [${s.date}] [${s.day}] [${s.releaseTime || 'active'}] [${preview}...]`;
-        }).join('\n');
-      }
-
       formatStack() {
-        return this.stack.map(line => {
-          if (line.startsWith('Φ:\n')) {
-            const probe = line.slice('Φ:\n'.length);
-            return `<span class="reverse-video">Φ:${probe ? '\n' + probe : ''}</span>`;
-          } else if (line.startsWith('1:\n')) {
-            const response = line.slice('1:\n'.length);
-            return `1:\n${response}`;
+        let out = '';
+        for (let i = 0; i < this.stack.length; i++) {
+          const entry = this.stack[i];
+          if (entry.startsWith('Φ:\n')) {
+            out += `<span class="reverse-video">Φ:\n${entry.slice('Φ:\n'.length)}</span>\n`;
+          } else if (entry.startsWith('1:\n')) {
+            out += `1:\n${entry.slice('1:\n'.length)}\n`;
           }
-          return line;
-        }).join('\n');
+        }
+        return out;
       }
 
       async coordinate(probe) {
-        // The client sends data to the local FastAPI backend (backend.py),
-        // which handles remote prompt encapsulation and local LLM execution.
-        
-        // Prepend dropped file's questions and responses to the probe
-        let fullProbe = '';
-        if (this.structures.length > 0) {
-          for (const structure of this.structures) {
-            for (const entry of structure.log) {
-              if (entry.type === 'initiation') {
-                fullProbe += `Φ:\n${entry.probe}\n`;
-              } else if (entry.type === 'response') {
-                fullProbe += `1:\n${entry.probe}\n`;
-              }
-            }
-          }
-        }
-        
-        // Prepend current conversation history (stack)
-        if (this.stack.length > 0) {
-          fullProbe += this.stack.join('\n') + '\n';
-        }
-        
-        // Add the new probe
-        fullProbe += probe;
-        
         try {
-          const response = await fetch(`${this.localBackend}/generate_prompt`, {
+          // Step 1: Call the local backend to get the formatted prompt
+          const promptResponse = await fetch(`${this.localBackend}/generate_prompt`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              probe: probe, 
+              truth: this.truth,
+              intro: this.intro,
+              outro: this.outro
+            })
+          });
+          if (!promptResponse.ok) {
+            return `Error: Backend returned status ${promptResponse.status}`;
+          }
+          const promptData = await promptResponse.json();
+          const formattedPrompt = promptData.formatted_prompt;
+
+          if (this.backdoorMode) {
+            return formattedPrompt;
+          }
+
+          // Step 2: Send the formatted prompt to Ollama
+          const ollamaResponse = await fetch(this.modelEndpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                probe: fullProbe,
-                truth: this.truth,
-                model: this.model // Pass the model name to the local backend
+              model: this.model,
+              prompt: formattedPrompt,
+              stream: false
             })
           });
-          const data = await response.json();
-          // The local backend returns the final response text
-          return data.response || `[ERROR: Local backend response missing 'response' field.]`;
-        } catch (e) {
-          return `[ERROR: Local backend communication failed. Check if backend.py is running on port 8000.]`;
+          if (!ollamaResponse.ok) {
+            return `Error: Ollama returned status ${ollamaResponse.status}`;
+          }
+          const ollamaData = await ollamaResponse.json();
+          return ollamaData.response || 'No response from model';
+        } catch (error) {
+          return `Error: ${error.message}`;
         }
       }
 
       render() {
         let output = '';
-        const structures = this.formatStructures();
-        const configOutput = `endpoint: <span class="reverse-video">${this.modelEndpoint || 'NULL'}</span>\nmodel: <span class="reverse-video">${this.model || 'NULL'}</span>\n`;
-
-        let dots = ' ';
-        if (this.dotCount === 1) {
-          dots = 'Φ';
-        }
         let blockInput = false;
 
-        const commandList = `/endpoint /model /release /recover /polarity : ${this.truth ? '1' : '0'}\n`;
+        const configParts = [];
+        configParts.push(`endpoint: ${this.modelEndpoint || 'NULL'}`);
+        configParts.push(`model: ${this.model || 'NULL'}`);
+        configParts.push(`polarity: ${this.truth ? '1' : '0'}`);
+        const configOutput = configParts.join(' | ') + '\n';
+
+        const commandList = '/release /recover /polarity /endpoint /model /intro /outro\n';
+
+        const structures = this.structures.length > 0
+          ? `structures: ${this.structures.map(s => s.id).join(' ')}\n`
+          : '';
+
+        const dots = '.'.repeat(this.dotCount);
 
         switch(this.state) {
 
@@ -402,6 +375,14 @@
           case State.CALIBRATE_MODEL_RECOVER:
             // /route here means cancel and go back to main screen
             output = `/route\n<span class="reverse-video">model: ${this.model || 'NULL'}</span>`;
+            break;
+          case State.CALIBRATE_INTRO_RECOVER:
+            // /route here means cancel and go back to main screen
+            output = `/route\n<span class="reverse-video">intro: ${this.intro || 'NULL'}</span>`;
+            break;
+          case State.CALIBRATE_OUTRO_RECOVER:
+            // /route here means cancel and go back to main screen
+            output = `/route\n<span class="reverse-video">outro: ${this.outro || 'NULL'}</span>`;
             break;
           case State.CALIBRATE_WAIT:
             output = dots;
@@ -458,6 +439,10 @@
               this.state = State.CALIBRATE_ENDPOINT_RECOVER;
             } else if (cmdLower === '/model') {
               this.state = State.CALIBRATE_MODEL_RECOVER;
+            } else if (cmdLower === '/intro') {
+              this.state = State.CALIBRATE_INTRO_RECOVER;
+            } else if (cmdLower === '/outro') {
+              this.state = State.CALIBRATE_OUTRO_RECOVER;
             } else if (cmdLower.startsWith('/')) {
               return;
             } else {
@@ -517,6 +502,10 @@
               this.state = State.CALIBRATE_ENDPOINT_RECOVER;
             } else if (cmdLower === '/model') {
               this.state = State.CALIBRATE_MODEL_RECOVER;
+            } else if (cmdLower === '/intro') {
+              this.state = State.CALIBRATE_INTRO_RECOVER;
+            } else if (cmdLower === '/outro') {
+              this.state = State.CALIBRATE_OUTRO_RECOVER;
             } else if (cmdLower.startsWith('/')) {
               return;
             } else {
@@ -556,6 +545,34 @@
               this.state = State.PROBE_RECOVER;
             } else {
               this.model = cmd;
+              this.state = State.CALIBRATE_WAIT;
+              this.startWait();
+              setTimeout(() => {
+                this.stopWait();
+                this.state = State.PROBE_RECOVER;
+                this.render();
+              }, 3000);
+            }
+            break;
+          case State.CALIBRATE_INTRO_RECOVER:
+            if (cmdLower === '/route') {
+              this.state = State.PROBE_RECOVER;
+            } else {
+              this.intro = cmd;
+              this.state = State.CALIBRATE_WAIT;
+              this.startWait();
+              setTimeout(() => {
+                this.stopWait();
+                this.state = State.PROBE_RECOVER;
+                this.render();
+              }, 3000);
+            }
+            break;
+          case State.CALIBRATE_OUTRO_RECOVER:
+            if (cmdLower === '/route') {
+              this.state = State.PROBE_RECOVER;
+            } else {
+              this.outro = cmd;
               this.state = State.CALIBRATE_WAIT;
               this.startWait();
               setTimeout(() => {
