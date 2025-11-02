@@ -8,6 +8,17 @@
 
 That's it! No Terminal commands needed.
 
+## Automatic Python Installation
+
+**Don't have Python?** No problem!
+
+If Python 3 is not installed on your Mac, re:search will:
+1. Detect that Python is missing
+2. Offer to install it automatically using Homebrew
+3. Guide you through the simple installation process
+
+You'll see a dialog asking if you want to install Python automatically. Click **"Yes"** and follow the prompts.
+
 ## First Launch
 
 On first launch, you may see a security warning saying "re:search.app cannot be opened because it is from an unidentified developer."
@@ -23,7 +34,7 @@ Alternatively, you can **right-click** (or Control-click) on `re:search.app` and
 
 Before using re:search, make sure you have:
 
-1. **Python 3.6+** installed (download from https://python.org if needed)
+1. **Python 3.6+** - Will be installed automatically if missing!
 2. **Ollama** installed and running (download from https://ollama.ai)
 
 ## First-Time Setup
@@ -48,11 +59,14 @@ To stop re:search:
 
 ## Troubleshooting
 
+### "Python 3 is required" error
+The app will offer to install Python automatically. Click "Yes" when prompted. If automatic installation fails, install Python manually from https://python.org
+
+### Automatic Python installation takes a long time
+The first-time Python installation via Homebrew can take 5-10 minutes. This is normal! The installation progress will show in the Terminal window.
+
 ### "Ollama is not running" error
 Start Ollama before launching re:search.
-
-### "Python 3 is required" error
-Install Python 3.6 or higher from https://python.org
 
 ### App won't open at all
 Make sure you've allowed the app in Security & Privacy settings (see "First Launch" above).
