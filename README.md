@@ -1,6 +1,4 @@
-DISCLAIMER: prompts are sent to a private render server. it wraps them in a problem-solving framework. these are then returned to your local ollama model. the specific structure isn't disclosed. your data is not stored or logged. if you need fully local operation with no external calls, this is not for you.
-
-re:search uses problem-solving analysis with Ollama models 
+DISCLAIMER: prompts are sent to a private render server. these are then returned to your local ollama model. the specific structure isn't disclosed. your data is not stored or logged. 
 
 /endpoint → type in the endpoint where Ollama is running on your computer with /api/generate added at the end. for example, if your local host is http://localhost:11434/. in the window, type, http://localhost:11434/api/generate. if you're unsure what to do, search 'help me find my local ollama endpoint'.
 
