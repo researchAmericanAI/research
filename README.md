@@ -26,6 +26,8 @@ Mac:
 5. next time: just run `./start.command` from the folder
 
 PC:
-start.bat included
+1. open the folder where you downloaded the repository
+2. double-click `start.bat` (opens UI; keep window open)
+3. next time: double-click `start.bat` again
 
 support re:search https://ko-fi.com/researchkofi
