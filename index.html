@@ -47,7 +47,7 @@
       position: absolute;
       visibility: hidden;
       font-family: 'Courier New', monospace;
-      white-space: pre;
+      white-white: pre;
     }
     .reverse-video {
       background: #BDCEF1;
@@ -60,7 +60,6 @@
   <div id="input" contenteditable="true"></div>
   <span id="measure">M</span>
   <script>
-    // State machine
     const State = {
       PROBE_RECOVER: 'probe_recover',
       PROBE_RELEASE: 'probe_release',
@@ -107,10 +106,7 @@
         this.structures = [];
         this.currentStructure = new Structure();
         this.stack = [];
-        // The client now ONLY talks to the local backend on port 8000
         this.localBackend = 'http://localhost:8000';
-
-        // This is the local Ollama Endpoint, visible only for config display/edit
         this.modelEndpoint = 'http://localhost:11434/api/generate';
         this.model = 'null';
         this.truth = false;
@@ -149,7 +145,7 @@
             e.preventDefault();
             const selection = window.getSelection();
             const text = selection.toString() || this.input.textContent;
-            navigator.clipboard.writeText(text).catch(err => console.error('Copy failed:', err));
+            navigator.clipboard.writeText(text).catch(() => {});
           } else if ((e.metaKey || e.ctrlKey) && (e.key === 'v' || e.key === 'V')) {
             e.preventDefault();
             navigator.clipboard.readText().then(text => {
@@ -169,12 +165,12 @@
               range.collapse(true);
               selection.removeAllRanges();
               selection.addRange(range);
-            }).catch(err => console.error('Paste failed:', err));
+            }).catch(() => {});
           } else if ((e.metaKey || e.ctrlKey) && (e.key === 'x' || e.key === 'X')) {
             e.preventDefault();
             const selection = window.getSelection();
             const text = selection.toString() || this.input.textContent;
-            navigator.clipboard.writeText(text).catch(err => console.error('Cut failed:', err));
+            navigator.clipboard.writeText(text).catch(() => {});
             if (selection.rangeCount > 0) {
               selection.getRangeAt(0).deleteContents();
             } else {
@@ -203,9 +199,7 @@
                 this.lastActionWasFileDrop = true;
                 this.render();
               }
-            } catch (error) {
-              // Silently fail on parse error
-            }
+            } catch (error) {}
           }
         });
       }
@@ -313,10 +307,6 @@
       }
 
       async coordinate(probe) {
-        // The client sends data to the local FastAPI backend (backend.py),
-        // which handles remote prompt encapsulation and local LLM execution.
-        
-        // Prepend dropped file's questions and responses to the probe
         let fullProbe = '';
         if (this.structures.length > 0) {
           for (const structure of this.structures) {
@@ -330,12 +320,10 @@
           }
         }
         
-        // Prepend current conversation history (stack)
         if (this.stack.length > 0) {
           fullProbe += this.stack.join('\n') + '\n';
         }
         
-        // Add the new probe
         fullProbe += probe;
         
         try {
@@ -347,11 +335,10 @@
                 truth: this.truth,
                 intro: this.intro,
                 outro: this.outro,
-                model: this.model // Pass the model name to the local backend
+                model: this.model
             })
           });
           const data = await response.json();
-          // The local backend returns the final response text
           return data.response || `[ERROR: Local backend response missing 'response' field.]`;
         } catch (e) {
           return `[ERROR: Local backend communication failed. Check if backend.py is running on port 8000.]`;
@@ -402,19 +389,15 @@
             if (this.stack.length > 0) output += this.formatStack();
             break;
           case State.CALIBRATE_ENDPOINT_RECOVER:
-            // /route here means cancel and go back to main screen
             output = `/route\n<span class="reverse-video">endpoint: ${this.modelEndpoint || 'NULL'}</span>`;
             break;
           case State.CALIBRATE_MODEL_RECOVER:
-            // /route here means cancel and go back to main screen
             output = `/route\n<span class="reverse-video">model: ${this.model || 'NULL'}</span>`;
             break;
           case State.CALIBRATE_INTRO_RECOVER:
-            // /route here means cancel and go back to main screen
             output = `/route\n<span class="reverse-video">intro: ${this.intro || 'NULL'}</span>`;
             break;
           case State.CALIBRATE_OUTRO_RECOVER:
-            // /route here means cancel and go back to main screen
             output = `/route\n<span class="reverse-video">outro: ${this.outro || 'NULL'}</span>`;
             break;
           case State.CALIBRATE_WAIT:
@@ -457,7 +440,6 @@
                 return;
               }
             } else if (cmdLower === '/recover') {
-              // If last action was dropping a file, delete the file
               if (this.lastActionWasFileDrop && this.structures.length > 0) {
                 this.structures.pop();
                 this.lastActionWasFileDrop = false;
@@ -490,10 +472,13 @@
               this.stack.push(`1:\n${response}`);
               this.currentStructure.addResponse(response);
               this.state = State.PROBE_RECOVER_RESPONSE;
+              this.lastInitiation = null;
             }
             break;
+
           case State.PROBE_RECOVER_CONFIRM:
             if (cmd === '0') {
+              this.lastInitiation = null;
               this.state = State.PROBE_RECOVER;
             } else if (cmd === '1') {
               if (this.stack.length > 0 && this.currentStructure.log.length > 0) {
@@ -519,10 +504,12 @@
               }
             }
             break;
+
           case State.PROBE_RECOVER_EDIT:
             if (cmdLower === '/release') {
               if (this.currentStructure) {
                 this.currentStructure.release();
+                this.lastInitiation = null;
                 return;
               }
             } else if (cmdLower === '/recover') {
@@ -530,14 +517,19 @@
               this.state = State.PROBE_RECOVER;
             } else if (cmdLower === '/polarity') {
               this.truth = !this.truth;
+              this.lastInitiation = null;
               this.state = State.PROBE_RECOVER;
             } else if (cmdLower === '/endpoint') {
+              this.lastInitiation = null;
               this.state = State.CALIBRATE_ENDPOINT_RECOVER;
             } else if (cmdLower === '/model') {
+              this.lastInitiation = null;
               this.state = State.CALIBRATE_MODEL_RECOVER;
             } else if (cmdLower === '/intro') {
+              this.lastInitiation = null;
               this.state = State.CALIBRATE_INTRO_RECOVER;
             } else if (cmdLower === '/outro') {
+              this.lastInitiation = null;
               this.state = State.CALIBRATE_OUTRO_RECOVER;
             } else if (cmdLower.startsWith('/')) {
               return;
@@ -558,6 +550,7 @@
               this.lastInitiation = null;
             }
             break;
+
           case State.CALIBRATE_ENDPOINT_RECOVER:
             if (cmdLower === '/route') {
               this.state = State.PROBE_RECOVER;
