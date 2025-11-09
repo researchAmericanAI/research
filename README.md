@@ -12,7 +12,7 @@
 
 /outro→ add a prompt wrapper postfix
 
-/polarity → 0: when in 0 mode, it will use the full problem-solving toolset; 1: when in 1 mode, it will try to answer with yes, no, or give a direct answer
+/polarity → 0: explanatory; 1: direct answer
 
 prerequisites: python 3.6+. Ollama if you do not have python, the .command will automatically install it for you on Mac
 
